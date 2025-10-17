@@ -1,27 +1,27 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: amazon-ns
+  name: flipkart-ns
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: amazon-app-deployment
-  namespace: amazon-ns
+  name: flipkart-app-deployment
+  namespace: flipkart-ns
 spec:
   replicas: 3  # Adjust the number of replicas as needed
   selector:
     matchLabels:
-      app: amazon-app
+      app: flipkart-app
   template:
     metadata:
       labels:
-        app: amazon-app
+        app: flipkart-app
     spec:
       containers:
-        - name: amazon-app-container
-          image: harishnshetty/amazon:latest  # Use your actual Docker image name and tag
+        - name: flipkart-app-container
+          image: harishnshetty/flipkart:latest  # Use your actual Docker image name and tag
           ports:
             - containerPort: 80  # The port your game app is listening on
           resources:
@@ -36,11 +36,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: amazon-app-service
-  namespace: amazon-ns
+  name: flipkart-app-service
+  namespace: flipkart-ns
 spec:
   selector:
-    app: amazon-app
+    app: flipkart-app
   ports:
     - protocol: TCP
       port: 80  # The port exposed by the service within the cluster
@@ -52,29 +52,29 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: myingress
-  namespace: amazon-ns
+  namespace: flipkart-ns
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/load-balancer-name: amazon-ns-alb
+    alb.ingress.kubernetes.io/load-balancer-name: flipkart-ns-alb
     # Target Type and Listener Port
 
 
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
 
-    alb.ingress.kubernetes.io/certificate-arn: <your arn value> # Replace with your ACM certificate ARN
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:970378220457:certificate/3fb881cb-aff7-4784-ac43-9d5921ff69a8 # Replace with your ACM certificate ARN
     alb.ingress.kubernetes.io/ssl-redirect: '443'
 spec:
   ingressClassName: alb
   rules:
-    - host: amazon.harishshetty.xyz
+    - host: flipkart.harishshetty.xyz
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: amazon-app-service  # Or your main store frontend
+                name: flipkart-app-service  # Or your main store frontend
                 port:
                   number: 80
 
@@ -86,6 +86,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: amazon-app-service # or your default frontend
+                name: flipkart-app-service # or your default frontend
                 port:
                   number: 80
