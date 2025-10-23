@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        SCANNER_HOME = tool 'sonar-scanner-7.3' // Jenkins Sonar Scanner name
+        SCANNER_HOME = tool 'sonar-scanner-7.3.0.5189' // Jenkins Sonar Scanner name
     }
 
     stages {
@@ -143,6 +143,9 @@ pipeline {
                     mimeType: 'text/html',
                     attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
                 )
+
+                // Clean workspace at the end only
+            cleanWs()
             }
         }
     }
