@@ -78,6 +78,7 @@ pipeline {
             steps {
                 script {
                     env.IMAGE_TAG = "amitsawant31/amazon:${BUILD_NUMBER}"
+
                     sh "docker rmi -f amazon ${env.IMAGE_TAG} || true"
                     sh "docker build -t amazon ."
                 }
@@ -123,29 +124,27 @@ pipeline {
 
     post {
         always {
-            node {
-                script {
-                    def buildStatus = currentBuild.currentResult
-                    def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'GitHub User'
+            script {
+                def buildStatus = currentBuild.currentResult
+                def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'GitHub User'
 
-                    emailext(
-                        subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                        body: """
-                            <p>This is a Jenkins Amazon CI/CD pipeline status report.</p>
-                            <p><b>Project:</b> ${env.JOB_NAME}</p>
-                            <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
-                            <p><b>Status:</b> ${buildStatus}</p>
-                            <p><b>Started by:</b> ${buildUser}</p>
-                            <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                        """,
-                        to: 'nikhildevaws25@gmail.com',
-                        from: 'nikhildevaws25@gmail.com',
-                        mimeType: 'text/html',
-                        attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
-                    )
+                emailext(
+                    subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                    body: """
+                        <p>This is a Jenkins Amazon CI/CD pipeline status report.</p>
+                        <p><b>Project:</b> ${env.JOB_NAME}</p>
+                        <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+                        <p><b>Status:</b> ${buildStatus}</p>
+                        <p><b>Started by:</b> ${buildUser}</p>
+                        <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    """,
+                    to: 'nikhildevaws25@gmail.com',
+                    from: 'nikhildevaws25@gmail.com',
+                    mimeType: 'text/html',
+                    attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
+                )
 
-                    cleanWs()
-                }
+                cleanWs()
             }
         }
     }
