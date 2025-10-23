@@ -26,9 +26,9 @@ pipeline {
         stage("SonarQube Analysis") {
             steps {
                 withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner \
+                    sh """$SCANNER_HOME/bin/sonar-scanner \
                         -Dsonar.projectName=amazon \
-                        -Dsonar.projectKey=amazon '''
+                        -Dsonar.projectKey=amazon"""
                 }
             }
         }
@@ -37,11 +37,10 @@ pipeline {
             steps {
                 script {
                     timeout(time: 3, unit: 'MINUTES') {
-                  
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                        waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                    }
                 }
             }
-        }
         }
 
         stage("Install NPM Dependencies") {
@@ -49,22 +48,19 @@ pipeline {
                 sh "npm install"
             }
         }
-        
-       
+
         stage("OWASP FS Scan") {
             steps {
                 dependencyCheck additionalArguments: '''
                     --scan ./ 
                     --disableYarnAudit 
-                    --disableNodeAudit 
-                
+                    --disableNodeAudit
                    ''',
                 odcInstallation: 'dp-check'
 
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             }
         }
-
 
         stage("Trivy File Scan") {
             steps {
@@ -88,41 +84,43 @@ pipeline {
         stage("Tag & Push to DockerHub") {
             steps {
                 script {
-                    withCredentials([string(credentialsId: 'docker-cred', variable: 'dockerpwd')]) {
-                        sh "docker login -u amitsawant31 -p ${dockerpwd}"
-                        sh "docker tag amazon ${env.IMAGE_TAG}"
-                        sh "docker push ${env.IMAGE_TAG}"
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub',  // Update with your actual credential ID
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh """
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
+                            docker tag amazon ${env.IMAGE_TAG}
+                            docker push ${env.IMAGE_TAG}
 
-                        // Also push latest
-                        sh "docker tag amazon amitsawant31 /amazon:latest"
-                        sh "docker push amitsawant31/amazon:latest"
+                            docker tag amazon $DOCKER_USER/amazon:latest
+                            docker push $DOCKER_USER/amazon:latest
+                        """
                     }
                 }
             }
         }
 
-       
-
         stage("Trivy Scan Image") {
             steps {
                 script {
                     sh """
-                    echo '🔍 Running Trivy scan on ${env.IMAGE_TAG}'
+                        echo '🔍 Running Trivy scan on ${env.IMAGE_TAG}'
 
-                    # JSON report
-                    trivy image -f json -o trivy-image.json ${env.IMAGE_TAG}
+                        # JSON report
+                        trivy image -f json -o trivy-image.json ${env.IMAGE_TAG}
 
-                    # HTML report using built-in HTML format
-                    trivy image -f table -o trivy-image.txt ${env.IMAGE_TAG}
+                        # Table report
+                        trivy image -f table -o trivy-image.txt ${env.IMAGE_TAG}
 
-                    # Fail build if HIGH/CRITICAL vulnerabilities found
-                    # trivy image --exit-code 1 --severity HIGH,CRITICAL ${env.IMAGE_TAG} || true
-                """
+                        # Optional: fail build on HIGH/CRITICAL
+                        # trivy image --exit-code 1 --severity HIGH,CRITICAL ${env.IMAGE_TAG} || true
+                    """
                 }
             }
         }
-
 
         stage("Deploy to Container") {
             steps {
@@ -134,32 +132,28 @@ pipeline {
         }
     }
 
-      post {
-    always {
-        script {
-            def buildStatus = currentBuild.currentResult
-            def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: ' Github User'
+    post {
+        always {
+            script {
+                def buildStatus = currentBuild.currentResult
+                def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'Github User'
 
-            emailext (
-                subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-                    <p>This is a Jenkins Amazon CICD pipeline status.</p>
-                    <p>Project: ${env.JOB_NAME}</p>
-                    <p>Build Number: ${env.BUILD_NUMBER}</p>
-                    <p>Build Status: ${buildStatus}</p>
-                    <p>Started by: ${buildUser}</p>
-                    <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                """,
-                to: 'nikhildevaws25@gmail.com',
-                from: 'nikhildevaws25@gmail.com',
-                mimeType: 'text/html',
-                attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
-                    )
+                emailext(
+                    subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                    body: """
+                        <p>This is a Jenkins Amazon CICD pipeline status.</p>
+                        <p>Project: ${env.JOB_NAME}</p>
+                        <p>Build Number: ${env.BUILD_NUMBER}</p>
+                        <p>Build Status: ${buildStatus}</p>
+                        <p>Started by: ${buildUser}</p>
+                        <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    """,
+                    to: 'nikhildevaws25@gmail.com',
+                    from: 'nikhildevaws25@gmail.com',
+                    mimeType: 'text/html',
+                    attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
+                )
+            }
         }
     }
 }
-}
-
-
-
-
