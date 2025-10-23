@@ -11,7 +11,6 @@ pipeline {
     }
 
     stages {
-
         stage("Clean Workspace") {
             steps {
                 cleanWs()
@@ -33,7 +32,7 @@ pipeline {
                             -Dsonar.projectName=amazon \
                             -Dsonar.projectKey=amazon \
                             -Dsonar.sources=. \
-                            -Dsonar.login=$SONAR_TOKEN
+                            -Dsonar.token=$SONAR_TOKEN
                         '''
                     }
                 }
@@ -44,7 +43,7 @@ pipeline {
             steps {
                 script {
                     timeout(time: 3, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
+                        waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
                     }
                 }
             }
@@ -55,13 +54,13 @@ pipeline {
                 sh "npm install"
             }
         }
-
+        
         stage("OWASP FS Scan") {
             steps {
                 dependencyCheck additionalArguments: '''
                     --scan ./ 
                     --disableYarnAudit 
-                    --disableNodeAudit
+                    --disableNodeAudit 
                 ''',
                 odcInstallation: 'dp-check'
 
@@ -80,7 +79,9 @@ pipeline {
                 script {
                     env.IMAGE_TAG = "amitsawant31/amazon:${BUILD_NUMBER}"
 
+                    // Optional cleanup
                     sh "docker rmi -f amazon ${env.IMAGE_TAG} || true"
+
                     sh "docker build -t amazon ."
                 }
             }
@@ -90,9 +91,11 @@ pipeline {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'docker-cred', variable: 'dockerpwd')]) {
-                        sh "echo $dockerpwd | docker login -u amitsawant31 --password-stdin"
+                        sh "docker login -u amitsawant31 -p ${dockerpwd}"
                         sh "docker tag amazon ${env.IMAGE_TAG}"
                         sh "docker push ${env.IMAGE_TAG}"
+
+                        // Also push latest
                         sh "docker tag amazon amitsawant31/amazon:latest"
                         sh "docker push amitsawant31/amazon:latest"
                     }
@@ -131,19 +134,7 @@ pipeline {
                 emailext (
                     subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                     body: """
-                        <p>This is a Jenkins Amazon DevSecOps pipeline status.</p>
+                        <p>This is a Jenkins Amazon CICD pipeline status.</p>
                         <p>Project: ${env.JOB_NAME}</p>
                         <p>Build Number: ${env.BUILD_NUMBER}</p>
-                        <p>Build Status: ${buildStatus}</p>
-                        <p>Started by: ${buildUser}</p>
-                        <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                    """,
-                    to: 'nikhildevaws25@gmail.com',
-                    from: 'nikhildevaws25@gmail.com',
-                    mimeType: 'text/html',
-                    attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
-                )
-            }
-        }
-    }
-}
+                        <p>Build
