@@ -27,13 +27,13 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar-server') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''
+                        sh """
                         $SCANNER_HOME/bin/sonar-scanner \
                             -Dsonar.projectName=amazon \
                             -Dsonar.projectKey=amazon \
                             -Dsonar.sources=. \
-                            -Dsonar.token=$SONAR_TOKEN
-                        '''
+                            -Dsonar.login=$SONAR_TOKEN
+                        """
                     }
                 }
             }
@@ -54,13 +54,13 @@ pipeline {
                 sh "npm install"
             }
         }
-        
+
         stage("OWASP FS Scan") {
             steps {
                 dependencyCheck additionalArguments: '''
                     --scan ./ 
                     --disableYarnAudit 
-                    --disableNodeAudit 
+                    --disableNodeAudit
                 ''',
                 odcInstallation: 'dp-check'
 
@@ -78,10 +78,7 @@ pipeline {
             steps {
                 script {
                     env.IMAGE_TAG = "amitsawant31/amazon:${BUILD_NUMBER}"
-
-                    // Optional cleanup
                     sh "docker rmi -f amazon ${env.IMAGE_TAG} || true"
-
                     sh "docker build -t amazon ."
                 }
             }
@@ -94,8 +91,6 @@ pipeline {
                         sh "docker login -u amitsawant31 -p ${dockerpwd}"
                         sh "docker tag amazon ${env.IMAGE_TAG}"
                         sh "docker push ${env.IMAGE_TAG}"
-
-                        // Also push latest
                         sh "docker tag amazon amitsawant31/amazon:latest"
                         sh "docker push amitsawant31/amazon:latest"
                     }
@@ -129,7 +124,7 @@ pipeline {
         always {
             script {
                 def buildStatus = currentBuild.currentResult
-                def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'GitHub User'
+                def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'Github User'
 
                 emailext (
                     subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
@@ -137,4 +132,16 @@ pipeline {
                         <p>This is a Jenkins Amazon CICD pipeline status.</p>
                         <p>Project: ${env.JOB_NAME}</p>
                         <p>Build Number: ${env.BUILD_NUMBER}</p>
-                        <p>Build
+                        <p>Build Status: ${buildStatus}</p>
+                        <p>Started by: ${buildUser}</p>
+                        <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    """,
+                    to: 'nikhildevaws25@gmail.com',
+                    from: 'nikhildevaws25@gmail.com',
+                    mimeType: 'text/html',
+                    attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
+                )
+            }
+        }
+    }
+}
