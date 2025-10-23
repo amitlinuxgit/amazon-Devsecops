@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        SCANNER_HOME = tool 'sonar-scanner-7.3.0.5189' // Jenkins Sonar Scanner name
+        SCANNER_HOME = tool 'sonar-scanner' // Jenkins Sonar Scanner name
     }
 
     stages {
@@ -114,16 +114,9 @@ pipeline {
 
         stage("Deploy to Container") {
             steps {
-                script {
-                    sh "docker rm -f amazon || true"
-                    sh "docker run -d --name amazon -p 80:80 ${env.IMAGE_TAG}"
-                }
-            }
-        }
-    }
-
-    post {
-        always {
+                script {post {
+    always {
+        node {
             script {
                 def buildStatus = currentBuild.currentResult
                 def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'GitHub User'
@@ -131,11 +124,11 @@ pipeline {
                 emailext(
                     subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                     body: """
-                        <p>This is an automated Amazon CI/CD pipeline report.</p>
+                        <p>This is a Jenkins Amazon CI/CD pipeline status report.</p>
                         <p><b>Project:</b> ${env.JOB_NAME}</p>
                         <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
                         <p><b>Status:</b> ${buildStatus}</p>
-                        <p><b>Triggered by:</b> ${buildUser}</p>
+                        <p><b>Started by:</b> ${buildUser}</p>
                         <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                     """,
                     to: 'nikhildevaws25@gmail.com',
@@ -144,9 +137,17 @@ pipeline {
                     attachmentsPattern: 'trivyfs.txt,trivy-image.json,trivy-image.txt,dependency-check-report.xml'
                 )
 
-                // Clean workspace at the end only
-            cleanWs()
+                cleanWs()
             }
         }
     }
 }
+
+                    sh "docker rm -f amazon || true"
+                    sh "docker run -d --name amazon -p 80:80 ${env.IMAGE_TAG}"
+                }
+            }
+        }
+    }
+
+    
